@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <math.h>
 
-#define MERSENNE_NUMBER 2147483647;
+#define MERSENNE_NUMBER 2147483647
 
 uint32_t calculate_basic_factorial(uint16_t number) {
     if (number <= 1) {
@@ -33,8 +33,8 @@ uint8_t number_length(uint32_t number) {
 }
 
 uint8_t find_max_width(uint8_t type_width, uint32_t number) {
-    uint8_t curr_width = number_length(number);
-    return curr_width > type_width ? curr_width : type_width;
+	uint8_t curr_width = number_length(number);
+	return curr_width > type_width ? curr_width : type_width;
 }
 
 uint8_t count_f_width(uint16_t n_start, uint16_t n_end, uint32_t curr_factorial) {
@@ -48,16 +48,16 @@ uint8_t count_f_width(uint16_t n_start, uint16_t n_end, uint32_t curr_factorial)
         }
     } else {
         for (uint32_t i = n_start + 1; i <= UINT16_MAX; i++) {
-	    curr_factorial = calculate_next_factorial(curr_factorial, i - 1, i);
-	    width_f = find_max_width(width_f, curr_factorial);
+			curr_factorial = calculate_next_factorial(curr_factorial, i - 1, i);
+			width_f = find_max_width(width_f, curr_factorial);
         }
         for (uint32_t i = 0; i <= n_end; i++) {
-	    curr_factorial = calculate_next_factorial(curr_factorial, i - 1, i);
-	    width_f = find_max_width(width_f, curr_factorial);
+			curr_factorial = calculate_next_factorial(curr_factorial, i - 1, i);
+			width_f = find_max_width(width_f, curr_factorial);
         }
     }
     width_f += 2;
-    return width_f;
+	return width_f;
 }
 
 uint8_t count_n_width(uint16_t n_start, uint16_t n_end) {
@@ -68,14 +68,14 @@ uint8_t count_n_width(uint16_t n_start, uint16_t n_end) {
         }
     } else {
         for (uint32_t i = n_start; i <= UINT16_MAX; i++) {
-	    width_n = find_max_width(width_n, i);
+			width_n = find_max_width(width_n, i);
         }
         for (uint32_t i = 0; i <= n_end; i++) {
-	    width_n = find_max_width(width_n, i);
+			width_n = find_max_width(width_n, i);
         }
     }
     width_n += 2;
-    return width_n;
+	return width_n;
 }
 
 void print_character(uint8_t amount, char symbol_code) {
@@ -97,7 +97,7 @@ void print_formatted_table(int8_t align, uint8_t width, uint32_t current_factori
     if (align == -1) {
         right_offset = width - current_num_width - left_offset;
     } else if (align == 0) {
-        right_offset = (width - current_num_width) / 2;
+        right_offset = (width - current_num_width) >> 1;
         left_offset = width - right_offset - current_num_width;
     } else {
         left_offset = width - current_num_width - right_offset;
@@ -105,63 +105,60 @@ void print_formatted_table(int8_t align, uint8_t width, uint32_t current_factori
 
     if (column_number == 1) {
         printf("|");
-	print_character(left_offset, 32);
+		print_character(left_offset, 32);
         printf("%" PRIu16, current_number);
-	print_character(right_offset, 32);
+		print_character(right_offset, 32);
     } else {
-	print_character(left_offset, 32);
+		print_character(left_offset, 32);
         printf("%" PRIu32, current_factorial);
-	print_character(right_offset, 32);
+		print_character(right_offset, 32);
         printf("|");
     }
 }
 
 void print_edging(int8_t align, uint8_t width_n, uint8_t width_f, uint8_t level) {
     printf("+");
-    print_character(width_n, 45);
+	print_character(width_n, 45);
     printf("+");
-    print_character(width_f, 45);
+	print_character(width_f, 45);
     printf("+");
     if (level == 1) {
-	printf("\n|");
+		printf("\n|");
         if (align == -1) {
-	    printf(" n");
-	    print_character(width_n - 2, 32);
-	    printf("| n!");
-	    print_character(width_f - 3, 32);
+			printf(" n");
+			print_character(width_n - 2, 32);
+			printf("| n!");
+			print_character(width_f - 3, 32);
         } else if (align == 0) {
-            uint8_t r1 = (width_n - 1) / 2;
-            uint8_t r2 = (width_f - 2) / 2;
-	    print_character(width_n - 1 - r1, 32);
+            uint8_t r1 = (width_n - 1) >> 1;
+            uint8_t r2 = (width_f - 2) >> 1;
+			print_character(width_n - 1 - r1, 32);
             printf("n");
-	    print_character(r1, 32);
+			print_character(r1, 32);
             printf("|");
-	    print_character(width_f - 2 - r2, 32);
+			print_character(width_f - 2 - r2, 32);
             printf("n!");
-	    print_character(r2, 32);
+			print_character(r2, 32);
         } else {
-	    print_character(width_n - 2, 32);
-	    printf("n |");
-	    print_character(width_f - 3, 32);
-	    printf("n! ");
+			print_character(width_n - 2, 32);
+			printf("n |");
+			print_character(width_f - 3, 32);
+			printf("n! ");
         }
-	    printf("|\n+");
-	    print_character(width_n, 45);
-            printf("+");
-	    print_character(width_f, 45);
-            printf("+");
+		printf("|\n+");
+		print_character(width_n, 45);
+        printf("+");
+		print_character(width_f, 45);
+        printf("+");
     }
     printf("\n");
 }
-//что касается объединения align == -1 и align == 1:
-// единственная возможность объединить эти случаи - это после проверки на align == 0 написать else { ...,
-// и далее снова много if и else. Поэтому я думаю, что всё-таки лучше оставить эти случаи разделёнными - это сохранит человекочитаемость.
 
 void print_line(int8_t align, uint32_t factorial, uint32_t num, uint8_t width_n, uint8_t width_f) {
-    print_formatted_table(align, width_n, factorial, num, 1);
-    printf("|");
-    print_formatted_table(align, width_f, factorial, num, 2);
-    printf("\n");
+	print_formatted_table(align, width_n, factorial, num, 1);
+	printf("|");
+	print_formatted_table(align, width_f, factorial, num, 2);
+	printf("\n");
 }
 
 int main() {
@@ -181,17 +178,17 @@ int main() {
     if (n_start > n_end) {
         for (uint32_t num = n_start; num <= UINT16_MAX; num++) {
             factorial = calculate_next_factorial(factorial, num - 1, num);
-	    print_line(align, factorial, num, width_n, width_f);
+			print_line(align, factorial, num, width_n, width_f);
         }
         for (uint32_t num = 0; num <= n_end; num++) {
             factorial = calculate_next_factorial(factorial, num - 1, num);
-	    print_line(align, factorial, num, width_n, width_f);
+			print_line(align, factorial, num, width_n, width_f);
         }
         print_edging(align, width_n, width_f, 2);
     } else {
         for (uint32_t num = n_start; num <= n_end; num++) {
             factorial = calculate_next_factorial(factorial, num - 1, num);
-	    print_line(align, factorial, num, width_n, width_f);
+			print_line(align, factorial, num, width_n, width_f);
         }
         print_edging(align, width_n, width_f, 2);
     }
