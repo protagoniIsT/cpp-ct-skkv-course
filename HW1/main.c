@@ -11,18 +11,18 @@ uint32_t calculate_basic_factorial(uint16_t number) {
     }
     uint32_t factorial = 1;
     for (uint64_t i = 1; i <= (uint64_t) number; i++) {
-        factorial = ((uint64_t) factorial * i) % MERSENNE_NUMBER;
+    	factorial = ((uint64_t) factorial * i) % MERSENNE_NUMBER;
     }
     return factorial;
 }
 
 uint32_t calculate_next_factorial(uint32_t start_factorial, uint32_t start, uint32_t end) {
     if (end <= 1) {
-        return 1;
+    	return 1;
     }
     uint32_t factorial = start_factorial;
     for (uint64_t i = start + 1; i <= (uint64_t) end; i++) {
-        factorial = ((uint64_t) factorial * i) % MERSENNE_NUMBER;
+		factorial = ((uint64_t) factorial * i) % MERSENNE_NUMBER;
     }
     return factorial;
 }
