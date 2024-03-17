@@ -5,7 +5,6 @@
 
 #define MERSENNE_NUMBER 2147483647
 
-<<<<<<< HEAD
 uint32_t calculate_basic_factorial(uint16_t number)
 {
 	if (number <= 1)
