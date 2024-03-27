@@ -279,7 +279,7 @@
              case 1: // К ближайшему чётному
                  GSR = num -> mantissa & (~(mant_mask(num->format) << (most_significant_bit(num->mantissa) -
                  mant_size(num->format))));
-				if ((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2))) &&
+		 if ((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2))) &&
 					((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 1))) ||
 					 (GSR & (~(3 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2)))))) {
                      num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
