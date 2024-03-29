@@ -290,10 +290,7 @@
                  }
                  break;
              case 2: // К +бесконечности
-                 if (num->mantissa
-                         << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format)
-                         +
-                             1)) {
+                 if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format) + 1)) {
                      num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
                      if (!num->sign) {
                          ++num->mantissa;
