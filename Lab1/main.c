@@ -222,6 +222,7 @@ Number multiply(uint8_t rounding, Number num1, Number num2) {
     return result;
 }
 
+<<<<<<< HEAD
 Number divide(uint8_t rounding, Number num1, Number num2) {
     Number result;
     result.format = num1.format;
@@ -253,6 +254,57 @@ Number divide(uint8_t rounding, Number num1, Number num2) {
     round_number(rounding, &result);
     return result;
 }
+=======
+ void round_number(uint8_t rounding, Number *num) {
+     if (num->type == 0 && rounding == 3) {
+         *num = to_IEEE754_standard(num->format, 0);
+         num->sign = 1;
+     }
+     uint64_t GSR;
+     if (num->type == 1) {
+         switch (rounding) {
+             case 0: // К нулю
+                 num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
+                 break;
+             case 1: // К ближайшему чётному
+                 GSR = num -> mantissa & (~(mant_mask(num->format) << (most_significant_bit(num->mantissa) -
+                 mant_size(num->format))));
+		 if ((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2))) &&
+					((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 1))) ||
+					 (GSR & (~(3 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2)))))) {
+                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
+                     ++num->mantissa;
+                     normalize(mant_mask(num->format), num);
+                 } else {
+                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
+                 }
+                 break;
+             case 2: // К +бесконечности
+                 if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format) + 1)) {
+                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
+                     if (!num->sign) {
+                         ++num->mantissa;
+                         normalize(mant_mask(num->format), num);
+                     }
+                 }
+                 break;
+             case 3: // К -бесконечности
+                 if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) +
+                 mant_size(num->format) + 1)) {
+                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
+                     if (num->sign) {
+                         ++num->mantissa;
+                         normalize(mant_mask(num->format), num);
+                     }
+                 }
+                 break;
+             default:
+                 break;
+         }
+         num->mantissa -= implicit_bit(num->format);
+     }
+ }
+>>>>>>> c5b3b16de636349892f71208d48e38bd4fa619a4
 
 uint8_t normalize(uint8_t mantissa, Number *num) {
     if (num->mantissa) {
