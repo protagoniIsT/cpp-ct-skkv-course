@@ -1,10 +1,11 @@
 #include "return_codes.h"
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 
 #define ZERO 0
-#define NONE 1
+#define OK 1
 #define INF 2
 #define NAN 3
 
@@ -65,11 +66,11 @@ void print_result(Number);
 
 Number to_IEEE754_standard(char format, uint32_t number) {
     Number num = {
-        .format = format == 'h',
-        .sign = sign(format == 'h', number),
-        .exponent = exponent(format == 'h', number),
-        .mantissa = mantissa(format == 'h', number),
-        .type = ZERO
+            .format = format == 'h',
+            .sign = sign(format == 'h', number),
+            .exponent = exponent(format == 'h', number),
+            .mantissa = mantissa(format == 'h', number),
+            .type = ZERO
     };
     num.type = normalize(mant_size(num.format), &num);
     return num;
@@ -122,7 +123,7 @@ uint8_t digits_to_print(uint8_t format) {
 Number add(uint8_t rounding, Number num1, Number num2) {
     Number result;
     result.format = num1.format;
-    result.type = NONE;
+    result.type = OK;
     if (num1.type == NAN || num2.type == NAN) {
         result.type = NAN;
     } else if (num1.type == INF || num2.type == INF) {
@@ -160,7 +161,7 @@ Number add(uint8_t rounding, Number num1, Number num2) {
 Number subtract(uint8_t rounding, Number num1, Number num2) {
     Number result;
     result.format = num1.format;
-    result.type = NONE;
+    result.type = OK;
     if (num1.type == NAN || num2.type == NAN) {
         result.type = NAN;
     } else if (num1.type == INF || num2.type == INF) {
@@ -197,7 +198,7 @@ Number subtract(uint8_t rounding, Number num1, Number num2) {
 Number multiply(uint8_t rounding, Number num1, Number num2) {
     Number result;
     result.format = num1.format;
-    result.type = NONE;
+    result.type = OK;
     result.sign = num1.sign ^ num2.sign;
     if (num1.type == NAN || num2.type == NAN) {
         result.type = NAN;
@@ -222,11 +223,10 @@ Number multiply(uint8_t rounding, Number num1, Number num2) {
     return result;
 }
 
-<<<<<<< HEAD
 Number divide(uint8_t rounding, Number num1, Number num2) {
     Number result;
     result.format = num1.format;
-    result.type = NONE;
+    result.type = OK;
     result.sign = num1.sign ^ num2.sign;
     if (num1.type == NAN || num2.type == NAN) {
         result.type = NAN;
@@ -254,57 +254,6 @@ Number divide(uint8_t rounding, Number num1, Number num2) {
     round_number(rounding, &result);
     return result;
 }
-=======
- void round_number(uint8_t rounding, Number *num) {
-     if (num->type == 0 && rounding == 3) {
-         *num = to_IEEE754_standard(num->format, 0);
-         num->sign = 1;
-     }
-     uint64_t GSR;
-     if (num->type == 1) {
-         switch (rounding) {
-             case 0: // К нулю
-                 num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
-                 break;
-             case 1: // К ближайшему чётному
-                 GSR = num -> mantissa & (~(mant_mask(num->format) << (most_significant_bit(num->mantissa) -
-                 mant_size(num->format))));
-		 if ((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2))) &&
-					((GSR & (1 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 1))) ||
-					 (GSR & (~(3 << (most_significant_bit(num->mantissa) - mant_size(num->format) - 2)))))) {
-                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
-                     ++num->mantissa;
-                     normalize(mant_mask(num->format), num);
-                 } else {
-                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
-                 }
-                 break;
-             case 2: // К +бесконечности
-                 if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format) + 1)) {
-                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
-                     if (!num->sign) {
-                         ++num->mantissa;
-                         normalize(mant_mask(num->format), num);
-                     }
-                 }
-                 break;
-             case 3: // К -бесконечности
-                 if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) +
-                 mant_size(num->format) + 1)) {
-                     num->mantissa >>= most_significant_bit(num->mantissa) - mant_size(num->format) - 1;
-                     if (num->sign) {
-                         ++num->mantissa;
-                         normalize(mant_mask(num->format), num);
-                     }
-                 }
-                 break;
-             default:
-                 break;
-         }
-         num->mantissa -= implicit_bit(num->format);
-     }
- }
->>>>>>> c5b3b16de636349892f71208d48e38bd4fa619a4
 
 uint8_t normalize(uint8_t mantissa, Number *num) {
     if (num->mantissa) {
@@ -334,13 +283,15 @@ void round_number(uint8_t rounding, Number *num) {
     }
     uint64_t GSR;
     uint64_t shift = most_significant_bit(num->mantissa) - mant_size(num->format);
+    uint64_t gen_inf_shift =
+            num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format));
     if (num->type == 1) {
         switch (rounding) {
-            case TOWARD_ZERO: // К нулю
+            case TOWARD_ZERO:     // К нулю
                 num->mantissa >>= shift - 1;
                 break;
-            case TOWARD_NEAREST_EVEN: // К ближайшему чётному
-                GSR = num->mantissa & (~(mant_mask(num->format) << (most_significant_bit(num->mantissa) - mant_size(num->format))));
+            case TOWARD_NEAREST_EVEN:     // К ближайшему чётному
+                GSR = num->mantissa & (~(mant_mask(num->format) << (shift)));
                 if ((GSR & (1 << (shift - 2))) && ((GSR & (1 << (shift - 1))) || (GSR & (~(3 << (shift - 2)))))) {
                     num->mantissa >>= shift - 1;
                     ++num->mantissa;
@@ -349,8 +300,8 @@ void round_number(uint8_t rounding, Number *num) {
                     num->mantissa >>= shift - 1;
                 }
                 break;
-            case TOWARD_POS_INF: // К +бесконечности
-                if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format) + 1)) {
+            case TOWARD_POS_INF:    // К +бесконечности
+                if (gen_inf_shift + 1) {
                     num->mantissa >>= shift - 1;
                     if (!num->sign) {
                         ++num->mantissa;
@@ -358,8 +309,8 @@ void round_number(uint8_t rounding, Number *num) {
                     }
                 }
                 break;
-            case TOWARD_NEG_INF: // К -бесконечности
-                if (num->mantissa << (sizeof(num->mantissa) * 8 - most_significant_bit(num->mantissa) + mant_size(num->format) + 1)) {
+            case TOWARD_NEG_INF:    // К -бесконечности
+                if (gen_inf_shift + 1) {
                     num->mantissa >>= shift - 1;
                     if (num->sign) {
                         ++num->mantissa;
@@ -376,7 +327,8 @@ void round_number(uint8_t rounding, Number *num) {
 
 uint8_t most_significant_bit(uint64_t value) {
     uint8_t bit = 1;
-    while (value >>= 1) ++bit;
+    while (value >>= 1)
+        ++bit;
     return bit;
 }
 
@@ -394,9 +346,11 @@ void print_result(Number num) {
         case ZERO:
             printf("0x0.%0*dp+0\n", digits_to_print(num.format), 0);
             break;
-        case NONE:
-            printf("0x1.%0*" PRIx64 "p%+hd\n", digits_to_print(num.format),
-                   num.mantissa << mant_gap_to_print(num.format), num.exponent - exp_offset(num.format));
+        case OK:
+            printf("0x1.%0*" PRIx64 "p%+" PRIi16 "\n",
+                   digits_to_print(num.format),
+                   num.mantissa << mant_gap_to_print(num.format),
+                   num.exponent - exp_offset(num.format));
             break;
         case INF:
             printf("inf\n");
@@ -416,17 +370,20 @@ int main(int argc, char *argv[]) {
 
     switch (argc) {
         case 6:
-            sscanf(argv[4], "%c", &operation);
-            sscanf(argv[5], "%i", &number2);
+            if (sscanf(argv[4], "%c", &operation) + sscanf(argv[5], "%" SCNx32, &number2) < 2) {
+                fprintf(stderr, "Error: invalid input format\n");
+                return ERROR_DATA_INVALID;
+            }
             if (operation != '+' && operation != '-' && operation != '*' && operation != '/') {
                 fprintf(stderr, "Error: Unsupported operation: %c\n", operation);
                 return ERROR_ARGUMENTS_INVALID;
             }
         case 4:
-            sscanf(argv[1], "%c", &format);
-            sscanf(argv[2], "%hhu", &rounding);
-            sscanf(argv[3], "%i", &number1);
-
+            if (sscanf(argv[1], "%c", &format) + sscanf(argv[2], "%hhu", &rounding) +
+                sscanf(argv[3], "%" SCNx32, &number1) < 3) {
+                fprintf(stderr, "Error: invalid datatype\n");
+                return ERROR_DATA_INVALID;
+            }
             if (format != 'h' && format != 'f') {
                 fprintf(stderr, "Error: Unsupported data format: %c\n", format);
                 return ERROR_ARGUMENTS_INVALID;
@@ -465,4 +422,3 @@ int main(int argc, char *argv[]) {
     print_result(num);
     return SUCCESS;
 }
-
