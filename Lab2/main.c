@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     if (audio_stream_idx_1 == -1) {
         fprintf(stderr, "No audio streams found in file 1");
         return ERROR_DATA_INVALID;
-	}
+    }
 
     if (argc == 2) {
         int num_of_channels = channel1.format_context->streams[audio_stream_idx_1]->codecpar->ch_layout.nb_channels;
@@ -84,9 +84,9 @@ int main(int argc, char *argv[]) {
         int ret_process2 = process_audio_stream(&channel2, audio_stream_idx_2);
         if (ret_process2 != SUCCESS) {
             free_resources(channel1);
-			free_resources(channel2);
-			return ret_process2;
-		}
+	    free_resources(channel2);
+	    return ret_process2;
+	}
 
         int ret_dec = decode_into_samples(&channel1, &channel2, audio_stream_idx_1, audio_stream_idx_2, channel_1_idx, channel_2_idx, argc);
         if (ret_dec != SUCCESS) return ret_dec;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
         ret_corr = cross_correlation(channel1.samples, channel2.samples, channel1.samples_cnt, channel2.samples_cnt, &correlation);
         if (ret_corr != SUCCESS) goto cleanup;
         int time_delay_samples = -channel2.samples_cnt + 1 + find_max_index(correlation, N);
-		free(correlation);
+	free(correlation);
         double time_delay_ms = (double)time_delay_samples * 1000.0 / sample_rate_total;
         printf("delta: %i samples\nsample rate: %i Hz\ndelta time: %i ms\n", time_delay_samples, sample_rate_total, (int)floor(time_delay_ms));
     }
