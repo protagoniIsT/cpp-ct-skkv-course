@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-	int ret_corr = SUCCESS;
+    int ret_corr = SUCCESS;
     if (channel1.samples_cnt > 0 && channel2.samples_cnt > 0) {
         int N = channel1.samples_cnt + channel2.samples_cnt - 1;
         ret_corr = cross_correlation(channel1.samples, channel2.samples, channel1.samples_cnt, channel2.samples_cnt, &correlation);
@@ -129,8 +129,8 @@ int main(int argc, char *argv[]) {
         double time_delay_ms = (double)time_delay_samples * 1000.0 / sample_rate_total;
         printf("delta: %i samples\nsample rate: %i Hz\ndelta time: %i ms\n", time_delay_samples, sample_rate_total, (int)floor(time_delay_ms));
     }
-	cleanup:
-	free_resources(channel1);
-	free_resources(channel2);
+    cleanup:
+    free_resources(channel1);
+    free_resources(channel2);
     return ret_corr;
 }
