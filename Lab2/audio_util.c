@@ -110,10 +110,10 @@ int decode_audio(AVCodecContext *codec_context, AVPacket *packet, AVFrame *frame
 
 bool is_supported_codec(unsigned int codec) {
 	return (codec == AV_CODEC_ID_FLAC
-			|| codec == AV_CODEC_ID_MP2
-			|| codec == AV_CODEC_ID_MP3
-			|| codec == AV_CODEC_ID_OPUS
-			|| codec == AV_CODEC_ID_AAC);
+	     || codec == AV_CODEC_ID_MP2
+	     || codec == AV_CODEC_ID_MP3
+	     || codec == AV_CODEC_ID_OPUS
+	     || codec == AV_CODEC_ID_AAC);
 }
 
 int process_audio_stream(AudioInfo *audio_info, int audio_stream_idx) {
