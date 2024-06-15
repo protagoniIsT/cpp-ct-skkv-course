@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>flag_icon.png</file>
+        <file>mine_icon.png</file>
+        <file>minesweeper_app_icon.ico</file>
+        <file>settings_window_icon.ico</file>
+        <file>sad_icon.ico</file>
+        <file>win_icon.ico</file>
+		<file>translations/language_en.qm</file>
+        <file>translations/language_es.qm</file>
+        <file>translations/language_de.qm</file>
+    </qresource>
+</RCC>
