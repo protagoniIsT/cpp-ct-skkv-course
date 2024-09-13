@@ -3,9 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <iterator>
 #include <memory>
-#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -17,7 +15,7 @@ public:
     typedef const T &const_reference;
     typedef std::ptrdiff_t difference_type;
     typedef size_t size_type;
-    static constexpr size_type INITIAL_IDENTIFIER = ((size_type) -1);
+    static constexpr size_type INITIAL_IDENTIFIER = -1;
 
     explicit BucketStorage(size_type new_block_capacity = 64);
     BucketStorage(const BucketStorage &other);
@@ -30,16 +28,16 @@ public:
     class iterator;
     class const_iterator;
 
-    iterator insert(const value_type &value);
-    iterator insert(value_type &&value);
+    template<typename U>
+    iterator insert(U &&value);
 
     iterator erase(iterator it);
 
     bool empty() const noexcept;
     size_type size() const noexcept;
     size_type capacity() const noexcept;
-    void shrink_to_fit();
-    void clear();
+    void shrink_to_fit() noexcept;
+    void clear() noexcept;
     void swap(BucketStorage &other) noexcept;
 
     iterator begin() noexcept;
@@ -55,110 +53,73 @@ private:
     void dealloc_block(size_type block_idx);
     void update_prev_identifiers(difference_type block_idx, difference_type elem_idx);
 
-    T **blocks;
+    value_type **blocks;
     size_type block_capacity;
     size_type num_of_blocks;
     size_type curr_size;
     size_type **identifiers;
 
-public:
-    class iterator {
+    template<bool isConst>
+    class BaseIterator {
+        friend class BucketStorage<T>;
+
     public:
         using iterator_category = std::bidirectional_iterator_tag;
         using value_type = T;
         using difference_type = std::ptrdiff_t;
-        using pointer = T *;
-        using reference = T &;
+        using pointer = typename std::conditional<isConst, const T *, T *>::type;
+        using reference = typename std::conditional<isConst, const T &, T &>::type;
+        using storage_type = typename std::conditional<isConst, const BucketStorage, BucketStorage>::type;
 
-        iterator() : curr_ptr(nullptr), storage(nullptr), block_idx(0), elem_idx(0) {}
+        bool operator==(const BaseIterator &other) const noexcept { return curr_ptr == other.curr_ptr; }
 
-        explicit iterator(pointer ptr, BucketStorage *storage, difference_type block_idx, difference_type elem_idx) : curr_ptr(ptr), storage(storage), block_idx(block_idx), elem_idx(elem_idx) {
+        bool operator!=(const BaseIterator &other) const noexcept { return curr_ptr != other.curr_ptr; }
+
+        template<bool OtherIsConst>
+        bool operator==(const BaseIterator<OtherIsConst> &other) const noexcept {
+            return curr_ptr == other.curr_ptr;
         }
 
-        iterator(const iterator &other) : curr_ptr(other.curr_ptr), storage(other.storage), block_idx(other.block_idx), elem_idx(other.elem_idx) {
+        template<bool OtherIsConst>
+        bool operator!=(const BaseIterator<OtherIsConst> &other) const noexcept {
+            return curr_ptr != other.curr_ptr;
         }
 
-        bool operator==(const iterator &other_it) const { return curr_ptr == other_it.curr_ptr; }
+        bool operator<(const BaseIterator &other) const noexcept {
+            return block_idx < other.block_idx || (block_idx == other.block_idx && elem_idx < other.elem_idx);
+        }
 
-        bool operator!=(const iterator &other_it) const { return curr_ptr != other_it.curr_ptr; }
+        bool operator<=(const BaseIterator &other) const noexcept { return *this < other || *this == other; }
 
-        bool operator==(const const_iterator &other_it) const;
+        bool operator>(const BaseIterator &other) const noexcept {
+            return block_idx > other.block_idx || (block_idx == other.block_idx && elem_idx > other.elem_idx);
+        }
 
-        bool operator!=(const const_iterator &other_it) const;
-
-        bool operator<(const iterator &other_it) const { return curr_ptr < other_it.curr_ptr; }
-
-        bool operator<=(const iterator &other_it) const { return curr_ptr <= other_it.curr_ptr; }
-
-        bool operator>(const iterator &other_it) const { return curr_ptr > other_it.curr_ptr; }
-
-        bool operator>=(const iterator &other_it) const { return curr_ptr >= other_it.curr_ptr; }
-
-        pointer operator->() const { return curr_ptr; }
+        bool operator>=(const BaseIterator &other) const noexcept { return *this > other || *this == other; }
 
         reference operator*() const { return *curr_ptr; }
 
-        iterator &operator=(const iterator &other_it) {
-            if (this != &other_it) {
-                curr_ptr = other_it.curr_ptr;
-                storage = other_it.storage;
-                block_idx = other_it.block_idx;
-                elem_idx = other_it.elem_idx;
+        pointer operator->() const { return curr_ptr; }
+
+        BaseIterator &operator=(const BaseIterator &other) {
+            if (this != &other) {
+                curr_ptr = other.curr_ptr;
+                storage = other.storage;
+                block_idx = other.block_idx;
+                elem_idx = other.elem_idx;
             }
             return *this;
         }
 
-        iterator &operator--() {
-            if (*this == storage->begin()) {
-                return *this;
-            }
-            if (curr_ptr == nullptr) {
-                block_idx = storage->num_of_blocks - 1;
-                elem_idx = storage->block_capacity - 1;
-                curr_ptr = &storage->blocks[block_idx][elem_idx];
+        BaseIterator &operator++() {
+            if constexpr (isConst) {
+                if (*this == storage->cend()) {
+                    return *this;
+                }
             } else {
-                if (elem_idx == 0) {
-                    if (block_idx == 0) {
-                        curr_ptr = nullptr;
-                        return *this;
-                    }
-                    --block_idx;
-                    elem_idx = storage->block_capacity - 1;
-                } else {
-                    --elem_idx;
+                if (*this == storage->end()) {
+                    return *this;
                 }
-            }
-
-            while (block_idx >= 0 && storage->identifiers[block_idx][elem_idx] > 0) {
-                size_type distance =
-                        storage->identifiers[block_idx][elem_idx] == INITIAL_IDENTIFIER ? 1 : storage->identifiers[block_idx][elem_idx];
-                for (size_type i = 0; i < distance; i++) {
-                    if (elem_idx == 0) {
-                        if (block_idx == 0) {
-                            curr_ptr = nullptr;
-                            return *this;
-                        }
-                        --block_idx;
-                        elem_idx = storage->block_capacity - 1;
-                    } else {
-                        --elem_idx;
-                    }
-                }
-            }
-
-            curr_ptr = &storage->blocks[block_idx][elem_idx];
-            return *this;
-        }
-
-        iterator operator--(int) {
-            iterator temp = *this;
-            --(*this);
-            return temp;
-        }
-
-        iterator &operator++() {
-            if (*this == storage->end()) {
-                return *this;
             }
             if (++elem_idx >= storage->block_capacity) {
                 elem_idx = 0;
@@ -180,187 +141,107 @@ public:
             } else {
                 curr_ptr = &storage->blocks[block_idx][elem_idx];
             }
-
             return *this;
         }
 
-        iterator operator++(int) {
-            iterator temp = *this;
+        BaseIterator operator++(int) {
+            BaseIterator temp = *this;
             ++(*this);
             return temp;
         }
 
-    private:
+        BaseIterator &operator--() {
+            if constexpr (isConst) {
+                if (*this == storage->cbegin()) {
+                    return *this;
+                }
+            } else {
+                if (*this == storage->begin()) {
+                    return *this;
+                }
+            }
+            if (curr_ptr == nullptr) {
+                block_idx = storage->num_of_blocks - 1;
+                elem_idx = storage->block_capacity - 1;
+                curr_ptr = &storage->blocks[block_idx][elem_idx];
+            } else {
+                if (elem_idx == 0) {
+                    if (block_idx == 0) {
+                        curr_ptr = nullptr;
+                        return *this;
+                    }
+                    --block_idx;
+                    elem_idx = storage->block_capacity - 1;
+                } else {
+                    --elem_idx;
+                }
+            }
+
+            while (block_idx >= (difference_type) 0 && storage->identifiers[block_idx][elem_idx] > 0) {
+                size_type distance =
+                        storage->identifiers[block_idx][elem_idx] == INITIAL_IDENTIFIER ? 1 : storage->identifiers[block_idx][elem_idx];
+                for (size_type i = 0; i < distance; i++) {
+                    if (elem_idx == 0) {
+                        if (block_idx == 0) {
+                            curr_ptr = nullptr;
+                            return *this;
+                        }
+                        --block_idx;
+                        elem_idx = storage->block_capacity - 1;
+                    } else {
+                        --elem_idx;
+                    }
+                }
+            }
+
+            curr_ptr = &storage->blocks[block_idx][elem_idx];
+            return *this;
+        }
+
+        BaseIterator operator--(int) {
+            BaseIterator temp = *this;
+            --(*this);
+            return temp;
+        }
+
+    protected:
+        BaseIterator() : curr_ptr(nullptr), storage(nullptr), block_idx(0), elem_idx(0) {}
+
+        BaseIterator(pointer ptr, storage_type *storage, difference_type block_idx, difference_type elem_idx)
+                                             : curr_ptr(ptr), storage(storage), block_idx(block_idx), elem_idx(elem_idx) {
+        }
+
+        BaseIterator(const BaseIterator<isConst> &it)
+                                             : curr_ptr(it.curr_ptr), storage(it.storage), block_idx(it.block_idx), elem_idx(it.elem_idx) {
+        }
         pointer curr_ptr;
-        BucketStorage *storage;
+        storage_type *storage;
         difference_type block_idx;
         difference_type elem_idx;
-        friend class BucketStorage;
     };
 
-    class const_iterator {
+public:
+    class iterator : public BaseIterator<false> {
     public:
-        using iterator_category = std::bidirectional_iterator_tag;
-        using value_type = T;
-        using difference_type = std::ptrdiff_t;
-        using pointer = const T *;
-        using reference = const T &;
+        using BaseIterator<false>::BaseIterator;
+        iterator(const BaseIterator<false> &base) : BaseIterator<false>(base) {}
+    };
 
-        const_iterator() : curr_ptr(nullptr), storage(nullptr), block_idx(0), elem_idx(0) {}
-
-        explicit const_iterator(pointer ptr, const BucketStorage *storage, difference_type block_idx, difference_type elem_idx)
-            : curr_ptr(ptr), storage(storage), block_idx(block_idx), elem_idx(elem_idx) {}
-
-        explicit const_iterator(const iterator &it)
-            : curr_ptr(it.curr_ptr), storage(it.storage), block_idx(it.block_idx), elem_idx(it.elem_idx) {}
-
-        bool operator==(const const_iterator &other_it) const { return curr_ptr == other_it.curr_ptr; }
-        bool operator!=(const const_iterator &other_it) const { return curr_ptr != other_it.curr_ptr; }
-
-        bool operator==(const iterator &other_it) const;
-        bool operator!=(const iterator &other_it) const;
-
-        bool operator<(const const_iterator &other_it) const { return curr_ptr < other_it.curr_ptr; }
-
-        bool operator<=(const const_iterator &other_it) const { return curr_ptr <= other_it.curr_ptr; }
-
-        bool operator>(const const_iterator &other_it) const { return curr_ptr > other_it.curr_ptr; }
-
-        bool operator>=(const const_iterator &other_it) const { return curr_ptr >= other_it.curr_ptr; }
-
-        pointer operator->() const { return curr_ptr; }
-
-        reference operator*() const { return *curr_ptr; }
-
-        const_iterator &operator=(const const_iterator &other_it) {
-            if (this != &other_it) {
-                curr_ptr = other_it.curr_ptr;
-                storage = other_it.storage;
-                block_idx = other_it.block_idx;
-                elem_idx = other_it.elem_idx;
-            }
-            return *this;
-        }
-
-        const_iterator &operator--() {
-            if (*this == storage->cbegin()) {
-                return *this;
-            }
-            if (curr_ptr == nullptr) {
-                block_idx = storage->num_of_blocks - 1;
-                elem_idx = storage->block_capacity - 1;
-                curr_ptr = &storage->blocks[block_idx][elem_idx];
-            } else {
-                if (elem_idx == 0) {
-                    if (block_idx == 0) {
-                        curr_ptr = nullptr;
-                        return *this;
-                    }
-                    --block_idx;
-                    elem_idx = storage->block_capacity - 1;
-                } else {
-                    --elem_idx;
-                }
-            }
-
-            while (block_idx >= 0 && storage->identifiers[block_idx][elem_idx] > 0) {
-                size_type distance =
-                        storage->identifiers[block_idx][elem_idx] == INITIAL_IDENTIFIER ? 1 : storage->identifiers[block_idx][elem_idx];
-                for (size_type i = 0; i < distance; i++) {
-                    if (elem_idx == 0) {
-                        if (block_idx == 0) {
-                            curr_ptr = nullptr;
-                            return *this;
-                        }
-                        --block_idx;
-                        elem_idx = storage->block_capacity - 1;
-                    } else {
-                        --elem_idx;
-                    }
-                }
-            }
-
-            curr_ptr = &storage->blocks[block_idx][elem_idx];
-            return *this;
-        }
-
-        const_iterator operator--(int) {
-            const_iterator temp = *this;
-            --(*this);
-            return temp;
-        }
-
-        const_iterator &operator++() {
-            if (*this == storage->cend()) {
-                return *this;
-            }
-            if (++elem_idx >= storage->block_capacity) {
-                elem_idx = 0;
-                ++block_idx;
-            }
-            while (block_idx < storage->num_of_blocks && storage->identifiers[block_idx][elem_idx] > 0) {
-                size_type distance =
-                        storage->identifiers[block_idx][elem_idx] == INITIAL_IDENTIFIER ? 1 : storage->identifiers[block_idx][elem_idx];
-                for (size_type i = 0; i < distance; i++) {
-                    ++elem_idx;
-                    if (elem_idx >= storage->block_capacity) {
-                        elem_idx = 0;
-                        ++block_idx;
-                    }
-                }
-            }
-            if (block_idx >= storage->num_of_blocks) {
-                curr_ptr = nullptr;
-            } else {
-                curr_ptr = &storage->blocks[block_idx][elem_idx];
-            }
-
-            return *this;
-        }
-
-        const_iterator operator++(int) {
-            const_iterator temp = *this;
-            ++(*this);
-            return temp;
-        }
-
-    private:
-        pointer curr_ptr;
-        const BucketStorage *storage;
-        difference_type block_idx;
-        difference_type elem_idx;
-        friend class BucketStorage;
+    class const_iterator : public BaseIterator<true> {
+    public:
+        using BaseIterator<true>::BaseIterator;
+        const_iterator(const BaseIterator<true> &base) : BaseIterator<true>(base) {}
     };
 };
 
 template<typename T>
-bool BucketStorage<T>::iterator::operator==(const const_iterator &other_it) const {
-    return curr_ptr == other_it.curr_ptr;
-}
-
-template<typename T>
-bool BucketStorage<T>::iterator::operator!=(const const_iterator &other_it) const {
-    return curr_ptr != other_it.curr_ptr;
-}
-
-template<typename T>
-bool BucketStorage<T>::const_iterator::operator==(const iterator &other_it) const {
-    return curr_ptr == other_it.curr_ptr;
-}
-
-template<typename T>
-bool BucketStorage<T>::const_iterator::operator!=(const iterator &other_it) const {
-    return curr_ptr != other_it.curr_ptr;
-}
-
-template<typename T>
 BucketStorage<T>::BucketStorage(size_type new_block_capacity)
-    : blocks(nullptr), block_capacity(new_block_capacity), num_of_blocks(0), curr_size(0), identifiers(nullptr) {
+                            : blocks(nullptr), block_capacity(new_block_capacity), num_of_blocks(0), curr_size(0), identifiers(nullptr) {
 }
 
 template<typename T>
 BucketStorage<T>::BucketStorage(const BucketStorage &other)
-    : block_capacity(other.block_capacity), num_of_blocks(other.num_of_blocks), curr_size(other.curr_size) {
+                                 : block_capacity(other.block_capacity), num_of_blocks(other.num_of_blocks), curr_size(other.curr_size) {
     try {
         blocks = new T *[num_of_blocks];
         identifiers = new size_type *[num_of_blocks];
@@ -385,31 +266,19 @@ BucketStorage<T>::BucketStorage(const BucketStorage &other)
             delete[] identifiers[i];
         }
 
-        throw std::runtime_error("BucketStorage copy constructor: memory allocation failed");
+        throw;
     }
 }
 
 template<typename T>
 BucketStorage<T>::BucketStorage(BucketStorage &&other) noexcept
-    : blocks(other.blocks), block_capacity(other.block_capacity), num_of_blocks(other.num_of_blocks),
-                                                           curr_size(other.curr_size), identifiers(other.identifiers) {
-    other.blocks = nullptr;
-    other.identifiers = nullptr;
-    other.num_of_blocks = 0;
-    other.curr_size = 0;
+                                             : blocks(nullptr), num_of_blocks(0), curr_size(0), block_capacity(0), identifiers(nullptr) {
+    swap(other);
 }
 
 template<typename T>
 BucketStorage<T>::~BucketStorage() {
-    for (size_type i = 0; i < num_of_blocks; ++i) {
-        for (size_type j = 0; j < block_capacity; ++j) {
-            if (identifiers[i][j] == 0) {
-                blocks[i][j].~T();
-            }
-        }
-        ::operator delete[](blocks[i]);
-        delete[] identifiers[i];
-    }
+    clear();
     delete[] blocks;
     delete[] identifiers;
 }
@@ -427,22 +296,15 @@ template<typename T>
 BucketStorage<T> &BucketStorage<T>::operator=(BucketStorage &&other) noexcept {
     if (this != &other) {
         this->clear();
-        blocks = other.blocks;
-        block_capacity = other.block_capacity;
-        num_of_blocks = other.num_of_blocks;
-        curr_size = other.curr_size;
-        identifiers = other.identifiers;
-        other.blocks = nullptr;
-        other.identifiers = nullptr;
-        other.num_of_blocks = 0;
-        other.curr_size = 0;
+        swap(other);
     }
     return *this;
 }
 
 template<typename T>
-typename BucketStorage<T>::iterator BucketStorage<T>::insert(const value_type &value) {
-    if (curr_size == block_capacity * num_of_blocks) {
+template<typename U>
+typename BucketStorage<T>::iterator BucketStorage<T>::insert(U &&value) {
+    if (size() == capacity()) {
         alloc_new_block();
     }
     size_type insertion_block_idx;
@@ -461,37 +323,7 @@ typename BucketStorage<T>::iterator BucketStorage<T>::insert(const value_type &v
         }
     }
 
-    new (&blocks[insertion_block_idx][insertion_elem_idx]) T(value);
-    identifiers[insertion_block_idx][insertion_elem_idx] = 0;
-    ++curr_size;
-
-    update_prev_identifiers(insertion_block_idx, insertion_elem_idx);
-
-    return iterator(&blocks[insertion_block_idx][insertion_elem_idx], this, insertion_block_idx, insertion_elem_idx);
-}
-
-template<typename T>
-typename BucketStorage<T>::iterator BucketStorage<T>::insert(value_type &&value) {
-    if (curr_size == block_capacity * num_of_blocks) {
-        alloc_new_block();
-    }
-    size_type insertion_block_idx;
-    size_type insertion_elem_idx = 0;
-    bool found_available = false;
-
-    for (insertion_block_idx = 0; insertion_block_idx < num_of_blocks; insertion_block_idx++) {
-        for (insertion_elem_idx = 0; insertion_elem_idx < block_capacity; insertion_elem_idx++) {
-            if (identifiers[insertion_block_idx][insertion_elem_idx] != 0) {
-                found_available = true;
-                break;
-            }
-        }
-        if (found_available) {
-            break;
-        }
-    }
-
-    new (&blocks[insertion_block_idx][insertion_elem_idx]) T(std::move(value));
+    new (&blocks[insertion_block_idx][insertion_elem_idx]) value_type(std::forward<U>(value));
     identifiers[insertion_block_idx][insertion_elem_idx] = 0;
     ++curr_size;
 
@@ -544,10 +376,12 @@ typename BucketStorage<T>::size_type BucketStorage<T>::capacity() const noexcept
 }
 
 template<typename T>
-void BucketStorage<T>::shrink_to_fit() {
-    if (curr_size == 0) {
+void BucketStorage<T>::shrink_to_fit() noexcept {
+    if (empty()) {
         return;
     }
+    iterator it = begin();
+
     size_type new_block_idx = 0;
     size_type new_elem_idx = 0;
     for (size_type i = 0; i < num_of_blocks; i++) {
@@ -583,8 +417,8 @@ void BucketStorage<T>::shrink_to_fit() {
 }
 
 template<typename T>
-void BucketStorage<T>::clear() {
-    if (curr_size == 0)
+void BucketStorage<T>::clear() noexcept {
+    if (empty())
         return;
 
     for (size_type i = 0; i < num_of_blocks; ++i) {
@@ -608,11 +442,12 @@ void BucketStorage<T>::clear() {
 
 template<typename T>
 void BucketStorage<T>::swap(BucketStorage &other) noexcept {
-    std::swap(blocks, other.blocks);
-    std::swap(block_capacity, other.block_capacity);
-    std::swap(num_of_blocks, other.num_of_blocks);
-    std::swap(curr_size, other.curr_size);
-    std::swap(identifiers, other.identifiers);
+    using std::swap;
+    swap(blocks, other.blocks);
+    swap(block_capacity, other.block_capacity);
+    swap(num_of_blocks, other.num_of_blocks);
+    swap(curr_size, other.curr_size);
+    swap(identifiers, other.identifiers);
 }
 
 template<typename T>
@@ -640,6 +475,7 @@ void BucketStorage<T>::alloc_new_block() {
         num_of_blocks = new_num_of_blocks;
 
     } catch (...) {
+        std::cerr << "Block memory allocation failed.";
         if (new_blocks) {
             for (size_type i = 0; i < new_num_of_blocks; i++) {
                 if (new_blocks[i]) {
@@ -661,7 +497,7 @@ void BucketStorage<T>::alloc_new_block() {
             delete[] new_identifiers;
         }
 
-        throw std::runtime_error("BucketStorage new block allocation: memory allocation failed");
+        throw;
     }
 }
 
@@ -686,7 +522,7 @@ void BucketStorage<T>::dealloc_block(size_type block_idx) {
 
 template<typename T>
 typename BucketStorage<T>::iterator BucketStorage<T>::begin() noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
+    if (num_of_blocks == 0 || empty()) {
         return end();
     }
 
@@ -702,7 +538,7 @@ typename BucketStorage<T>::iterator BucketStorage<T>::begin() noexcept {
 
 template<typename T>
 typename BucketStorage<T>::const_iterator BucketStorage<T>::begin() const noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
+    if (num_of_blocks == 0 || empty()) {
         return cend();
     }
 
@@ -718,13 +554,13 @@ typename BucketStorage<T>::const_iterator BucketStorage<T>::begin() const noexce
 
 template<typename T>
 typename BucketStorage<T>::const_iterator BucketStorage<T>::cbegin() const noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
+    if (num_of_blocks == 0 || empty()) {
         return cend();
     }
     for (size_type block_idx = 0; block_idx < num_of_blocks; ++block_idx) {
         for (size_type elem_idx = 0; elem_idx < block_capacity; ++elem_idx) {
             if (identifiers[block_idx][elem_idx] == 0) {
-                return const_iterator(&blocks[block_idx][elem_idx], this, block_idx, elem_idx);
+                return const_iterator(&blocks[block_idx][elem_idx], const_cast<BucketStorage<T> *>(this), block_idx, elem_idx);
             }
         }
     }
@@ -733,7 +569,7 @@ typename BucketStorage<T>::const_iterator BucketStorage<T>::cbegin() const noexc
 
 template<typename T>
 typename BucketStorage<T>::iterator BucketStorage<T>::end() noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
+    if (num_of_blocks == 0 || empty()) {
         return iterator(nullptr, this, num_of_blocks, 0);
     }
     for (difference_type block_idx = num_of_blocks - 1; block_idx >= 0; --block_idx) {
@@ -748,7 +584,7 @@ typename BucketStorage<T>::iterator BucketStorage<T>::end() noexcept {
 
 template<typename T>
 typename BucketStorage<T>::const_iterator BucketStorage<T>::end() const noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
+    if (num_of_blocks == 0 || empty()) {
         return const_iterator(nullptr, this, num_of_blocks, 0);
     }
     for (difference_type block_idx = num_of_blocks - 1; block_idx >= 0; --block_idx) {
@@ -763,17 +599,7 @@ typename BucketStorage<T>::const_iterator BucketStorage<T>::end() const noexcept
 
 template<typename T>
 typename BucketStorage<T>::const_iterator BucketStorage<T>::cend() const noexcept {
-    if (num_of_blocks == 0 || curr_size == 0) {
-        return const_iterator(nullptr, this, num_of_blocks, 0);
-    }
-    for (difference_type block_idx = num_of_blocks - 1; block_idx >= 0; --block_idx) {
-        for (difference_type elem_idx = block_capacity - 1; elem_idx >= 0; --elem_idx) {
-            if (identifiers[block_idx][elem_idx] == 0) {
-                return const_iterator(nullptr, this, num_of_blocks, 0);
-            }
-        }
-    }
-    return const_iterator(nullptr, this, num_of_blocks, 0);
+    return const_iterator(nullptr, const_cast<BucketStorage<T> *>(this), num_of_blocks, 0);
 }
 
 template<typename T>
