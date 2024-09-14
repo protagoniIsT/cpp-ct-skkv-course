@@ -1,1 +1,1 @@
-#S2 ITMO CT C++ course
+# S2 ITMO CT C++ course
