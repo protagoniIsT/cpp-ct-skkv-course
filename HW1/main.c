@@ -173,7 +173,7 @@ void print_line(int8_t align, uint32_t factorial, uint32_t num, uint8_t width_n,
 	printf("\n");
 }
 
-int main()
+int main(void)
 {
 	int32_t n_start_provided = 0, n_end_provided = 0;
 	uint16_t n_start = 0, n_end = 0;
