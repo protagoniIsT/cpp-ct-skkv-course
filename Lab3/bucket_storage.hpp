@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -32,8 +31,9 @@ public:
     using iterator = BaseIterator<false>;
     using const_iterator = BaseIterator<true>;
 
-    iterator insert(const T &value);
-    iterator insert(T &&value);
+    template<typename F>
+    std::enable_if_t<std::is_same_v<T, std::remove_const_t<std::remove_reference_t<F>>>, iterator>
+    insert(F&&);
 
     iterator erase(iterator it);
 
@@ -57,8 +57,6 @@ private:
     void dealloc_block(size_type block_idx);
     void update_prev_identifiers(difference_type block_idx, difference_type elem_idx);
 
-    template<typename U>
-    iterator insert_pf(U &&value);
 
     template<bool isConst>
     typename BucketStorage<T>::template BaseIterator<isConst> construct_ret_iterator(bool is_end) const noexcept;
@@ -219,7 +217,7 @@ private:
     protected:
         BaseIterator() : curr_ptr(nullptr), storage(nullptr), block_idx(0), elem_idx(0) {}
 
-        BaseIterator(pointer ptr, storage_type *storage, difference_type block_idx, difference_type elem_idx) : curr_ptr(ptr), storage(storage), block_idx(block_idx), elem_idx(elem_idx) {
+        [[maybe_unused]] BaseIterator(pointer ptr, storage_type *storage, difference_type block_idx, difference_type elem_idx) : curr_ptr(ptr), storage(storage), block_idx(block_idx), elem_idx(elem_idx) {
         }
 
         pointer curr_ptr;
@@ -285,18 +283,9 @@ BucketStorage<T> &BucketStorage<T>::operator=(BucketStorage &&other) noexcept {
 }
 
 template<typename T>
-typename BucketStorage<T>::iterator BucketStorage<T>::insert(const T &value) {
-    return insert_pf(value);
-}
-
-template<typename T>
-typename BucketStorage<T>::iterator BucketStorage<T>::insert(T &&value) {
-    return insert_pf(std::move(value));
-}
-
-template<typename T>
 template<typename U>
-typename BucketStorage<T>::iterator BucketStorage<T>::insert_pf(U &&value) {
+std::enable_if_t<std::is_same_v<T, std::remove_const_t<std::remove_reference_t<U>>>, typename BucketStorage<T>::iterator>
+BucketStorage<T>::insert(U&& value) {
     if (size() == capacity()) {
         alloc_new_block();
     }
